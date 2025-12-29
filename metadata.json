@@ -1,0 +1,7 @@
+{
+  "name": "EduTrack: College Bus System",
+  "description": "A comprehensive real-time college bus tracking application featuring dedicated portals for students, drivers, and transport managers.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
