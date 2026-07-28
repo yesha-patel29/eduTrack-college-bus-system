@@ -1,0 +1,6 @@
+{
+  "name": "Bus Tracker Pro",
+  "description": "Real-time bus tracking web application with Passenger, Driver, and Manager roles using Express and Socket.IO.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

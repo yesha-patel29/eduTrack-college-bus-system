@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Bus Tracking App</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="manifest" href="/manifest.json">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('Service Worker registered!', reg))
+        .catch(err => console.error('Service Worker failed:', err));
+    });
+  }
+</script>
+    
+    <style>
+        /* Ensuring the status colors work correctly */
+        .live { color: #16a34a; font-weight: bold; }
+        .off { color: #6b7280; font-weight: bold; }
+        .status { margin-top: 10px; font-size: 15px; }
+
+        /* Enhanced Manager Detail Mode Styles */
+        .edit-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #7c3aed;
+            margin-bottom: 4px;
+            display: block;
+            text-transform: uppercase;
+        }
+        .manager-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border: 1.5px solid #e5e7eb;
+            font-family: inherit;
+            background: #f9fafb;
+        }
+        .manager-input:focus {
+            outline: none;
+            border-color: #7c3aed;
+            background: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <div id="role-selection">
+        <div class="role-box">
+            <h2>🚌 Bus Tracker</h2>
+            <p>Who are you?</p>
+            <button id="passengerBtn">Passenger / Student</button>
+            <button id="driverBtn">Driver</button>
+            <button id="managerBtn" style="background: #7c3aed; color: white; margin-top: 10px;">Bus Manager</button>
+        </div>
+    </div>
+
+    <div id="driver-route-entry" class="hidden-panel" style="display: none;">
+        <div class="role-box">
+            <h2>🆔 Driver Check-in</h2>
+            <p>Enter assigned Route Title to access dashboard.</p>
+            <input type="text" id="driverRouteInput" placeholder="Enter Route (e.g. City Center Express)" 
+                   style="width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            <p id="driverError" style="color: #ef4444; font-size: 13px; margin-bottom: 10px; display: none;">❌ Route not found in manager list!</p>
+            <button id="verifyRouteBtn" style="background: #7c3aed; color: white;">Verify & Enter</button>
+            <button id="backFromDriverEntry" style="background: #6b7280; color: white; margin-top: 8px;">Back</button>
+        </div>
+    </div>
+
+    <div id="manager-portal" class="hidden-panel" style="display: none;">
+        <div class="role-box" style="max-width: 500px; width: 90%;">
+            <h2>📊 Manager Dashboard</h2>
+            <div style="display: flex; justify-content: space-around; margin: 20px 0; background: #f3f4f6; padding: 15px; border-radius: 12px;">
+                <div style="text-align: center;"><strong id="totalBuses" style="font-size: 20px; color: #7c3aed;">0</strong><p style="margin:0; font-size: 14px;">Buses</p></div>
+                <div style="text-align: center;"><strong id="totalRoutes" style="font-size: 20px; color: #7c3aed;">0</strong><p style="margin:0; font-size: 14px;">Routes</p></div>
+            </div>
+            
+            <h3 style="text-align: left; font-size: 16px;">Active Routes</h3>
+            <div id="manager-route-list" style="text-align: left; max-height: 250px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #eee; padding: 10px; border-radius: 8px; cursor: pointer;">
+                <p style="text-align: center; color: #9ca3af;">No routes added yet.</p>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px;">
+                <button id="backFromManagerPortal" style="background: #6b7280; color: white; flex: 1;">Back to Roles</button>
+                <button id="openModalBtn" style="background: #16a34a; color: white; font-size: 28px; width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="manager-detail-view" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f3f4f6; z-index: 10000; padding: 20px; overflow-y: auto;">
+        <div class="driver-card" style="margin: 0 auto; background: white; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 450px; padding: 25px;">
+            <h2 style="text-align: center; margin-bottom: 10px;">Route Management</h2>
+            
+            <div id="manager-view-mode">
+                <div class="driver-info">
+                    <p><strong>Bus No:</strong> <span id="disp-bus-no"></span></p>
+                    <p><strong>Driver:</strong> <span id="disp-driver-name"></span></p>
+                    <p><strong>Route:</strong> <span id="disp-route-name"></span></p>
+                    <p class="status">Status: <span id="manager-live-status" class="off">OFFLINE</span></p>
+                </div>
+                <h3 style="margin-top: 20px; font-size: 16px;">Stops Path</h3>
+                <ul class="stop-list" id="manager-vertical-stops" style="max-height: 200px; overflow-y: auto; margin-bottom: 20px;">
+                </ul>
+            </div>
+
+            <div id="manager-edit-mode" style="display: none;">
+                <label class="edit-label">Bus Number</label>
+                <input type="text" id="editBusNo" class="manager-input">
+                
+                <label class="edit-label">Driver Name</label>
+                <input type="text" id="editDriverName" class="manager-input">
+                
+                <label class="edit-label">Route Title</label>
+                <input type="text" id="editRouteName" class="manager-input">
+                
+                <label class="edit-label">Stops (Comma Separated)</label>
+                <textarea id="editStops" class="manager-input" style="height: 80px;"></textarea>
+            </div>
+
+            <div class="trip-controls" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 10px;">
+                    <button id="managerEditBtn" style="background: #f59e0b; color: white; flex: 1;">Edit Info</button>
+                    <button id="managerSaveBtn" style="background: #10b981; color: white; flex: 1; display: none;">Save Changes</button>
+                    <button id="managerTrackBtn" style="background: #3b82f6; color: white; flex: 1;">Track Bus</button>
+                </div>
+                <button id="managerCloseDetailBtn" style="background: #6b7280; color: white; width: 100%;">Back to Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="route-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center;">
+        <div class="role-box" style="text-align: left; width: 90%; max-width: 400px; background: white;">
+            <h3 style="margin-top: 0;">➕ Add New Route</h3>
+            <label style="font-size: 12px; color: #666;">Bus Number</label>
+            <input type="text" id="newBusNo" placeholder="e.g. GJ-06-AB-1234" style="width:100%; margin-bottom: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <label style="font-size: 12px; color: #666;">Driver Name</label>
+            <input type="text" id="newDriverName" placeholder="Full Name" style="width:100%; margin-bottom: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <label style="font-size: 12px; color: #666;">Route Title</label>
+            <input type="text" id="newRouteName" placeholder="e.g. City Center Express" style="width:100%; margin-bottom: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            <label style="font-size: 12px; color: #666;">Stops (Comma Separated)</label>
+            <textarea id="newStops" placeholder="Stop 1, Stop 2, Stop 3..." style="width:100%; height: 60px; margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit;"></textarea>
+            <div style="display: flex; gap: 10px;">
+                <button id="saveRouteBtn" style="background: #16a34a; color: white; flex: 2;">Save Route</button>
+                <button id="closeModalBtn" style="background: #ef4444; color: white; flex: 1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="passenger-stop-entry" class="hidden-panel" style="display: none;">
+        <div class="role-box">
+            <h2>🚏 Find Your Bus</h2>
+            <p>Enter your stop name to see available buses.</p>
+            <input type="text" id="stopInput" placeholder="Enter Stop Name (e.g. University)" 
+                   style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ddd;">
+            <button id="findBusBtn" style="background: #2563eb; color: white;">Search Buses</button>
+            <button id="backFromStopEntry" style="background: #6b7280; color: white; margin-top: 10px;">Back to Roles</button>
+        </div>
+    </div>
+
+    <div id="bus-list-panel" class="hidden-panel" style="display: none;">
+        <div class="role-box">
+            <h2>Available Buses</h2>
+            <p>Buses for Stop: <span id="selectedStopDisp" style="font-weight: bold; color: #2563eb;"></span></p>
+            <div id="dynamic-bus-list"></div>
+            <button id="backFromBusList" style="background: #6b7280; color: white; margin-top: 15px;">Back to Search</button>
+        </div>
+    </div>
+
+    <div id="bus-detail-card" class="hidden-panel" style="display: none;">
+        <div class="driver-card" style="background: white; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 450px;">
+            <h2 style="text-align: center; margin-bottom: 20px;">Bus Details</h2>
+            <div class="driver-info" id="dynamic-bus-details"></div>
+            <h3 style="margin-top: 15px; font-size: 16px;">Stops on Route</h3>
+            <ul class="stop-list" id="dynamic-stop-list" style="max-height: 150px; overflow-y: auto; margin-bottom: 20px;"></ul>
+            <div class="trip-controls">
+                <button id="finalTrackBtn" style="background: #16a34a; color: white;">Track Bus</button>
+                <button id="backToBusList" style="background: #6b7280; color: white;">Back to List</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="driver-portal" style="display: none;">
+        <div class="driver-card">
+            <h2>Driver Dashboard</h2>
+            <div class="driver-info" id="driver-display-info"></div>
+            <h3>Stops</h3>
+            <ul class="stop-list" id="driver-stop-list"></ul>
+            <div class="trip-controls">
+                <button id="startTrip">Start Trip</button>
+                <button id="viewMap">View Map</button>
+                <button id="endTrip">End Trip</button>
+                <button id="backFromDriverDash" style="background: #6b7280; color: white; width: 100%;">Exit Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="map-view" style="display: none;">
+        <button id="backToDashboard">⬅ Back to Dashboard</button>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <!-- Socket.IO JS served directly from the express server -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Custom Script -->
+    <script src="/js/script.js"></script>
+</body>
+</html>

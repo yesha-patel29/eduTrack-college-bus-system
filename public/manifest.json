@@ -1,0 +1,18 @@
+{
+  "name": "Bus Tracker Pro",
+  "short_name": "BusTracker",
+  "id": "/SVIT BUS TRACKER",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/713/713337.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
