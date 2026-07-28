@@ -1,6 +1,15 @@
 {
+<<<<<<< HEAD
   "name": "Bus Tracker Pro",
   "description": "Real-time bus tracking web application with Passenger, Driver, and Manager roles using Express and Socket.IO.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
+=======
+  "name": "EduTrack: College Bus System",
+  "description": "A comprehensive real-time college bus tracking application featuring dedicated portals for students, drivers, and transport managers.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
+>>>>>>> 45a1a7888aed4b2e6876b1ee59ab69c4f824461d
